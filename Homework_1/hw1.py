@@ -78,16 +78,15 @@ def median_filter(im,kernel_size):
                 end_i=i+k
                 end_j=j+k
                 if(i-k<=0):
-                    start_i=i
-                    new_value = np.median(im[i:i+k,j:j+k])
+                    start_i=0
                 if(j - k <= 0):
-                    start_j=j
+                    start_j=0
 
                 if(i+k>=im_height):
-                    end_i=i
+                    end_i=im_height
 
                 if(j+k>=im_width):
-                    end_j=j
+                    end_j=im_width
 
                 new_value = np.median(im[start_i:end_i,start_j:end_j])
 
@@ -96,40 +95,55 @@ def median_filter(im,kernel_size):
                 im_out[i, j, c] = new_value
     return im_out
 
+#P3
+def use_filter2D(im, kernel_size):
+    std=1
+
+    x1 = 1 / (2 * np.pi * std ** 2)
+    k = int((kernel_size - 1) / 2)
+    gaussian_kern = np.zeros((kernel_size, kernel_size), dtype=float)
+    for x in range(-k, k + 1):
+        for y in range(-k, k + 1):
+            x2 = np.exp(-(x ** 2 + y ** 2) / (2 * std ** 2))
+            gaussian_kern[x + k][y + k] = x1 * x2
+    im_out = cv2.filter2D(im, -1,gaussian_kern)
+    return im_out
 
 
-kernel_size=3
-im = cv2.imread("art.png")
+im = cv2.imread("lena.png")
 im = im.astype(float)
-#im_out = mean_filter(im,kernel_size)
-#im_out = im_out.astype(np.uint8)
-#cv2.imwrite('hw1_mean_filter3.png', im_out)
-#cv2.imshow("Mean Filter", im_out)
+
+#P1
+for kernel_size in (3,5,7):
+    im_out = mean_filter(im,kernel_size)
+    im_out = im_out.astype(np.uint8)
+    cv2.imwrite('hw1_mean_filter'+str(kernel_size)+'.png', im_out)
+
+    im_out = sharpening_filter(im,kernel_size)
+    im_out= im_out.astype(np.uint8)
+    cv2.imwrite('hw1_sharpening_filter'+str(kernel_size)+'.png', im_out)
+
+    im_out = gaussian_filter(im,kernel_size)
+    im_out = im_out.astype(np.uint8)
+    cv2.imwrite('hw1_gaussian_filter'+str(kernel_size)+'.png', im_out)
+
+#P2
+art = cv2.imread("art.png")
+art = art.astype(float)
+for kernel_size in (3,5,7,9):
+    im_out = median_filter(art,kernel_size)
+    im_out = im_out.astype(np.uint8)
+    cv2.imwrite('hw1_median_filter_art'+str(kernel_size)+'.png', im_out)
+
+    im_out = mean_filter(art,kernel_size)
+    im_out = im_out.astype(np.uint8)
+    cv2.imwrite('hw1_mean_filter_art'+str(kernel_size)+'.png', im_out)
+
+#P3
+for kernel_size in (3,5,7):
+    im_out= use_filter2D(im, kernel_size)
+    im_out = im_out.astype(np.uint8)
+    cv2.imwrite('hw1_filter2D_'+str(kernel_size)+'.png', im_out)
 
 
-kernel_size=3
-
-#im_out = sharpening_filter(im,kernel_size)
-#im_out= im_out.astype(np.uint8)
-#cv2.imwrite('hw1_sharpening_filter3.png', im_out)
-#cv2.imshow("Sharpening Filter", im_out)
-
-
-#im_out = gaussian_filter(im,kernel_size)
-#im_out = im_out.astype(np.uint8)
-#cv2.imwrite('hw1_gaussian_filter3.png', im_out)
-#cv2.imshow("Gaussian Filter", im_out)
-
-
-im_out = median_filter(im,kernel_size)
-im_out = im_out.astype(np.uint8)
-cv2.imwrite('hw1_median_filter_3.png', im_out)
-cv2.imshow("Median Filter", im_out)
-
-im_out = mean_filter(im,kernel_size)
-im_out = im_out.astype(np.uint8)
-cv2.imwrite('hw1_mean_filter_art_3.png', im_out)
-cv2.imshow("Mean Filter", im_out)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
 
