@@ -60,6 +60,7 @@ def gaussian_filter(im, kernel_size):
             x2=np.exp(-(x**2+y**2)/(2*std**2))
             gaussian_kern[x+k][y+k]=x1*x2
 
+    gaussian_kern *= 1.0/gaussian_kern.sum()
     im_out = convolution(im,gaussian_kern)
     return im_out
 
@@ -75,8 +76,8 @@ def median_filter(im,kernel_size):
             for i in range(im_height):
                 start_i = i-k
                 start_j=j-k
-                end_i=i+k
-                end_j=j+k
+                end_i=i+k+1
+                end_j=j+k+1
                 if(i-k<=0):
                     start_i=0
                 if(j - k <= 0):
@@ -91,7 +92,7 @@ def median_filter(im,kernel_size):
                 new_value = np.median(im[start_i:end_i,start_j:end_j])
 
 
-                new_value = (int)(min(max(0, new_value), 255))  # bound the pixel within (0, 255)
+              #  new_value = (int)(min(max(0, new_value), 255))  # bound the pixel within (0, 255)
                 im_out[i, j, c] = new_value
     return im_out
 
@@ -141,9 +142,12 @@ for kernel_size in (3,5,7,9):
 
 #P3
 for kernel_size in (3,5,7):
+    im_gaussian=cv2.imread("hw1_gaussian_filter"+str(kernel_size)+".png")
+    im_gaussian = im_gaussian.astype(float)
     im_out= use_filter2D(im, kernel_size)
     im_out = im_out.astype(np.uint8)
     cv2.imwrite('hw1_filter2D_'+str(kernel_size)+'.png', im_out)
-
+    result=np.all(np.isclose(im_out,im_gaussian))
+    print(result) #it prints 3 times false because the images are not equal
 
 
