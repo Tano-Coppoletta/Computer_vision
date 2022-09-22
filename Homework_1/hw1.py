@@ -107,6 +107,7 @@ def use_filter2D(im, kernel_size):
         for y in range(-k, k + 1):
             x2 = np.exp(-(x ** 2 + y ** 2) / (2 * std ** 2))
             gaussian_kern[x + k][y + k] = x1 * x2
+    gaussian_kern *= 1.0 / gaussian_kern.sum()
     im_out = cv2.filter2D(im, -1,gaussian_kern)
     return im_out
 
