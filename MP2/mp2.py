@@ -3,28 +3,35 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-def hysteresis_thresholding(im, low_threshold, high_threshold):
-    M,N = im.shape
-    im_out = np.zeros((M,N))
-    #strong edges
-    strong_edge_i, strong_edge_j = np.where(im>high_threshold)
-    #noise
-    noise_i,noise_j = np.where(im<low_threshold)
-    #weak edges
-    weak_i,weak_j = np.where((im<=high_threshold) & (im>=low_threshold))
-    im_out[strong_edge_i,strong_edge_j] = 255
-    im_out[noise_i,noise_j] = 125
-    im_out[weak_i,weak_j] = 0
-    return im_out
 
-def edge_linking(im):
-    M,N = im.shape
-    im_out = np.zeros((M,N))
-    for i in range(1,M-1):
-        for j in range(1,N-1):
-            if(im[i,j]==125):
-                if 255 in [im[i-1,j-1],im[i-1,j],im[i-1,j+1],im[i,j-1],im[i,j+1],im[i+1,j-1],im[i+1,j],im[i+1,j+1]]:
-                    im_out[i,j]=255
+def hysteresis_thresholding(im, low_threshold, high_threshold):
+    M, N = im.shape
+    map_strong = np.zeros((M, N))
+    map_weak = np.zeros((M, N))
+    map_noise = np.zeros((M, N))
+
+    # strong edges
+    strong_edge_i, strong_edge_j = np.where(im > high_threshold)
+    # noise
+    noise_i, noise_j = np.where(im < low_threshold)
+    # weak edges
+    weak_i, weak_j = np.where((im <= high_threshold) & (im >= low_threshold))
+    map_strong[strong_edge_i, strong_edge_j] = 1
+    map_noise[noise_i, noise_j] = 1
+    map_weak[weak_i, weak_j] = 1
+    return map_strong,map_weak,map_noise
+
+
+def edge_linking(map_strong, map_weak):
+    M, N = map_strong.shape
+    im_out = map_strong.copy()
+    for i in range(1, M - 1):
+        for j in range(1, N - 1):
+            if (map_weak[i, j] ==1):
+                if map_strong[i - 1, j - 1]==1 or im[i - 1, j]==1 or im[i - 1, j + 1]==1 or im[i, j - 1]==1 or im[i, j + 1]==1 or  im[i + 1, j - 1]==1 or im[i + 1, j]==1 or im[i + 1, j + 1]==1:
+                    im_out[i, j] = 1
+                else:
+                    im_out[i, j] = 0
     return im_out
 
 
@@ -98,6 +105,7 @@ def nms(magnitude, direction):
 
     return res
 
+
 def HoughTransform(edge_map):
     theta_values = np.deg2rad(np.arange(-90.0, 90.0))
     height, width = edge_map.shape
@@ -120,59 +128,136 @@ def HoughTransform(edge_map):
     return accumulator, theta_values, rho_values
 
 
+def suppress_lines(accumulator, lines, tolerance):
+    max = (-1, -1)
+    maxs = []
 
-im = cv2.imread("lena.png", 0)
+    for i in range(0, len(lines) - 1):
+        if i == len(lines) - 2 or (np.all(max != (-1, -1)) and not (
+                np.isclose(lines[i, 0], lines[i + 1, 0], atol=tolerance)
+                and np.isclose(lines[i, 1], lines[i + 1, 1], atol=tolerance))):
+            maxs.append(max)
+            max = (-1, -1)
+        else:
+            if np.all(max == (-1, -1)) or accumulator[lines[i, 0], lines[i, 1]] > accumulator[max[0], max[1]]:
+                max = lines[i]
+    return maxs
+
+
+im = cv2.imread("lena.png",0)
 im = im.astype(float)
 
 gaussian_kernel = get_gaussian_kernel(9, 3)
 im_smoothed = convolution(im, gaussian_kernel)
 
-#cv2.imshow("Original image", im.astype(np.uint8))
-#cv2.imshow("Smoothed image", im_smoothed.astype(np.uint8))
-#cv2.waitKey()
-#cv2.destroyAllWindows()
+# cv2.imshow("Original image", im.astype(np.uint8))
+# cv2.imshow("Smoothed image", im_smoothed.astype(np.uint8))
+# cv2.waitKey()
+# cv2.destroyAllWindows()
 
 gradient_magnitude, gradient_direction = compute_gradient(im_smoothed)
 
 edge_nms = nms(gradient_magnitude, gradient_direction)
 
-after_hysteresis=hysteresis_thresholding(edge_nms,0.05*255,0.1*255)
-after_hysteresis = after_hysteresis.astype(np.uint8)
-cv2.imwrite('hysteresis_1' + '.png', after_hysteresis)
 
-after_edge_linking = edge_linking(after_hysteresis)
-after_edge_linking = after_edge_linking.astype(np.uint8)
-cv2.imwrite('after_edge_linking_1'+ '.png', after_edge_linking)
+for low_t,high_t in [(0.05,0.1),(0.09,0.2),(0.0001,0.001)]:
+
+    map_strong, map_weak, map_noise = hysteresis_thresholding(edge_nms, low_t * 255, high_t * 255)
+    map_strong = map_strong.astype(np.uint8)*255
+    cv2.imwrite(f"map_strong_{low_t}_{high_t}.png", map_strong)
+
+    map_weak = map_weak.astype(np.uint8)*255
+    cv2.imwrite(f"map_weak_{low_t}_{high_t}.png", map_weak)
+
+    map_noise = map_noise.astype(np.uint8)*255
+    cv2.imwrite(f"map_noise{low_t}_{high_t}.png", map_noise)
+
+    after_edge_linking = edge_linking(map_strong,map_weak)
+    after_edge_linking = after_edge_linking.astype(np.uint8)
+    cv2.imwrite(f"after_edge_linking_{low_t}_{high_t}.png", after_edge_linking)
+
+im1 = cv2.imread('shape.bmp')
+im2 = cv2.imread('paper.bmp')
+i=0
+for im in [im1,im2]:
+
+    im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+
+    # CHANGE
+    edge_map = cv2.Canny(im_gray, 70, 150)
+
+    accumulator, theta_values, rho_values = HoughTransform(edge_map)
+
+    lines = np.argwhere(accumulator > 40)
+
+    lines = suppress_lines(accumulator, lines,10)
+
+    height, width = im_gray.shape
+    for line in lines:
+        rho = rho_values[line[0]]
+        theta = theta_values[line[1]]
+        slope = -np.cos(theta) / np.sin(theta)
+        intercept = rho / np.sin(theta)
+        x1, x2 = 0, width
+        y1 = int(slope * x1 + intercept)
+        y2 = int(slope * x2 + intercept)
+        cv2.line(im, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
 
-im = cv2.imread('shape.bmp')
+    if i==0:
+        cv2.imwrite('shape_edges' + '.png', edge_map)
+        cv2.imwrite('shape_hough_transform' + '.png',  (accumulator * 255 / accumulator.max()).astype(np.uint8))
+        cv2.imwrite('shape_output' + '.png', im)
+    else:
+        cv2.imwrite('paper_edges' + '.png', edge_map)
+        cv2.imwrite('paper_hough_transform' + '.png',  (accumulator * 255 / accumulator.max()).astype(np.uint8))
+        cv2.imwrite('paper_output' + '.png', im)
+    i+=1
 
+
+#using canny
+
+im = cv2.imread("lena.png")
 im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+out_canny = cv2.Canny(im_gray,0.05*255,0.1*255)
+cv2.imwrite('point_4' + '.png', out_canny)
 
-#CHANGE
-edge_map = cv2.Canny(im_gray, 70, 150)
+im = cv2.imread("shape.bmp")
+im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+edges = cv2.Canny(im_gray, 50,180)
+lines = cv2.HoughLines(edges, 1, np.pi/180, 30)
 
-accumulator, theta_values, rho_values = HoughTransform(edge_map)
-
-
-lines = np.argwhere(accumulator > 30)
-
-
-
-height, width = im_gray.shape
-for line in lines:
-    rho = rho_values[line[0]]
-    theta = theta_values[line[1]]
-    slope = -np.cos(theta)/np.sin(theta)
-    intercept = rho/np.sin(theta)
-    x1, x2 = 0, width
-    y1 = int(slope*x1 + intercept)
-    y2 = int(slope*x2 + intercept)
+for r_theta in lines:
+    arr = np.array(r_theta[0], dtype=np.float64)
+    r, theta = arr
+    a = np.cos(theta)
+    b = np.sin(theta)
+    x0 = a * r
+    y0 = b * r
+    x1 = int(x0 + 1000 * (-b))
+    y1 = int(y0 + 1000 * (a))
+    x2 = int(x0 - 1000 * (-b))
+    y2 = int(y0 - 1000 * (a))
     cv2.line(im, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
-cv2.imshow("Edges", edge_map)
-cv2.imshow("Hough Transform", (accumulator*255/accumulator.max()).astype(np.uint8))
-cv2.imshow("Output", im)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+cv2.imwrite('point_4_shape.png',im)
 
+
+im = cv2.imread("paper.bmp")
+im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+edges = cv2.Canny(im_gray, 50,180)
+lines = cv2.HoughLines(edges, 1, np.pi/180, 30)
+
+for r_theta in lines:
+    arr = np.array(r_theta[0], dtype=np.float64)
+    r, theta = arr
+    a = np.cos(theta)
+    b = np.sin(theta)
+    x0 = a * r
+    y0 = b * r
+    x1 = int(x0 + 1000 * (-b))
+    y1 = int(y0 + 1000 * (a))
+    x2 = int(x0 - 1000 * (-b))
+    y2 = int(y0 - 1000 * (a))
+    cv2.line(im, (x1, y1), (x2, y2), (0, 0, 255), 2)
+cv2.imwrite('point_4_paper.png',im)
